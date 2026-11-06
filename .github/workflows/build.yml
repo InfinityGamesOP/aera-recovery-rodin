@@ -16,7 +16,7 @@ jobs:
       run: |
         sudo apt-get update
         sudo apt-get install -y git-core gnupg flex bison build-essential zip curl \
-        zlib1g-dev libc6-dev-i386 libn32ncurses5-dev x11proto-core-dev libx11-dev \
+        zlib1g-dev libc6-dev-i386 libncurses5-dev libncurses5-dev:i386 x11proto-core-dev libx11-dev \
         lib32z1-dev libgl1-mesa-dev libxml2-utils xsltproc unzip fontconfig cpio python3
 
         mkdir -p ~/.bin
@@ -39,7 +39,7 @@ jobs:
         # Pobranie wskazanego drzewa urządzeń crDroid dla Poco X7 Pro (rodin)
         git clone https://github.com/crdroidandroid/android_device_xiaomi_rodin.git device/xiaomi/rodin --depth=1
 
-        # Automatyczne czyszczenie flag specyficznych dla innych custom recovery, jeśli występują
+        # Automatyczne czyszczenie flag specyficznych dla innych custom recovery
         sed -i '/FOX_/d' device/xiaomi/rodin/BoardConfig.mk || true
         sed -i '/OF_/d' device/xiaomi/rodin/BoardConfig.mk || true
 
