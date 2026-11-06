@@ -29,7 +29,7 @@ jobs:
         export PATH=~/.bin:$PATH
         mkdir -p ~/aera && cd ~/aera
 
-        # Używamy stabilnego manifestu TWRP 12.1 jako bazy dla AERA
+        # Inicjalizacja bazy źródeł Android 12.1 (TWRP/Omni Manifest)
         repo init -u https://github.com/minimal-manifest-twrp/platform_manifest_twrp_aosp.git -b twrp-12.1 --depth=1
         repo sync -c --no-clone-bundle --no-tags --optimized-fetch --prune -j$(nproc)
 
@@ -37,14 +37,31 @@ jobs:
         rm -rf bootable/recovery
         git clone https://github.com/AERA-Recovery/android_bootable_recovery.git bootable/recovery --depth=1
 
-        # Pobranie drzewa urządzeń crDroid dla Poco X7 Pro (rodin)
+        # Pobranie wskazanego drzewa urządzeń crDroid dla Poco X7 Pro (rodin)
         git clone https://github.com/crdroidandroid/android_device_xiaomi_rodin.git device/xiaomi/rodin --depth=1
 
-        # Usunięcie zbędnych flag z BoardConfig.mk
-        sed -i '/FOX_/d' device/xiaomi/rodin/BoardConfig.mk || true
-        sed -i '/OF_/d' device/xiaomi/rodin/BoardConfig.mk || true
+        # Dostosowanie konfiguracji pod profil omni_rodin
+        cd device/xiaomi/rodin
+        sed -i '/FOX_/d' BoardConfig.mk || true
+        sed -i '/OF_/d' BoardConfig.mk || true
+        
+        # Tworzenie wymaganego pliku omni_rodin.mk z plików crDroid
+        if [ -f crdroid_rodin.mk ]; then
+          cp crdroid_rodin.mk omni_rodin.mk
+          sed -i 's/crdroid_rodin/omni_rodin/g' omni_rodin.mk
+        elif [ -f lineagerecovery_rodin.mk ]; then
+          cp lineagerecovery_rodin.mk omni_rodin.mk
+          sed -i 's/lineagerecovery_rodin/omni_rodin/g' omni_rodin.mk
+        fi
 
-        # Uruchomienie budowania
+        # Regeneracja pliku AndroidProducts.mk dla lunch omni_rodin-eng
+        cat <<EOF > AndroidProducts.mk
+PRODUCT_MAKEFILES := \
+    \$(LOCAL_DIR)/omni_rodin.mk
+EOF
+        cd ~/aera
+
+        # Uruchomienie procedury budowania
         source build/envsetup.sh
         export ALLOW_MISSING_DEPENDENCIES=true
         lunch omni_rodin-eng
