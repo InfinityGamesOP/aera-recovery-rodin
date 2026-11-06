@@ -29,22 +29,22 @@ jobs:
         export PATH=~/.bin:$PATH
         mkdir -p ~/aera && cd ~/aera
 
-        # Inicjalizacja bazy źródeł Android 14 (Omni/TWRP Manifest)
-        repo init -u https://gitlab.com/OrangeFox/Manifest.git -b fox_12.1 --depth=1
+        # Używamy stabilnego manifestu TWRP 12.1 jako bazy dla AERA
+        repo init -u https://github.com/minimal-manifest-twrp/platform_manifest_twrp_aosp.git -b twrp-12.1 --depth=1
         repo sync -c --no-clone-bundle --no-tags --optimized-fetch --prune -j$(nproc)
 
-        # Podmiana domyślnego recovery na silnik AERA (LVGL)
+        # Podmiana silnika recovery na AERA (LVGL)
         rm -rf bootable/recovery
         git clone https://github.com/AERA-Recovery/android_bootable_recovery.git bootable/recovery --depth=1
 
-        # Pobranie wskazanego drzewa urządzeń crDroid dla Poco X7 Pro (rodin)
+        # Pobranie drzewa urządzeń crDroid dla Poco X7 Pro (rodin)
         git clone https://github.com/crdroidandroid/android_device_xiaomi_rodin.git device/xiaomi/rodin --depth=1
 
-        # Automatyczne czyszczenie flag specyficznych dla innych custom recovery
+        # Usunięcie zbędnych flag z BoardConfig.mk
         sed -i '/FOX_/d' device/xiaomi/rodin/BoardConfig.mk || true
         sed -i '/OF_/d' device/xiaomi/rodin/BoardConfig.mk || true
 
-        # Uruchomienie procedury budowania
+        # Uruchomienie budowania
         source build/envsetup.sh
         export ALLOW_MISSING_DEPENDENCIES=true
         lunch omni_rodin-eng
