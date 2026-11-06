@@ -45,13 +45,13 @@ jobs:
         sed -i '/FOX_/d' BoardConfig.mk || true
         sed -i '/OF_/d' BoardConfig.mk || true
         
-        # Tworzenie wymaganego pliku omni_rodin.mk z plików crDroid
-        if [ -f crdroid_rodin.mk ]; then
-          cp crdroid_rodin.mk omni_rodin.mk
-          sed -i 's/crdroid_rodin/omni_rodin/g' omni_rodin.mk
-        elif [ -f lineagerecovery_rodin.mk ]; then
-          cp lineagerecovery_rodin.mk omni_rodin.mk
-          sed -i 's/lineagerecovery_rodin/omni_rodin/g' omni_rodin.mk
+        # Tworzenie wymaganego pliku omni_rodin.mk z dowolnego pliku produktu w drzewie
+        TARGET_MK=$(ls *_rodin.mk 2>/dev/null | head -n 1)
+        if [ -n "$TARGET_MK" ]; then
+          cp "$TARGET_MK" omni_rodin.mk
+          sed -i 's/'"${TARGET_MK%.mk}"'/omni_rodin/g' omni_rodin.mk
+        else
+          cp BoardConfig.mk omni_rodin.mk
         fi
 
         # Regeneracja pliku AndroidProducts.mk dla lunch omni_rodin-eng
