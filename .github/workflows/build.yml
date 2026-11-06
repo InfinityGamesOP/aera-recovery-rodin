@@ -37,24 +37,23 @@ jobs:
         rm -rf bootable/recovery
         git clone https://github.com/AERA-Recovery/android_bootable_recovery.git bootable/recovery --depth=1
 
-        # Pobranie wskazanego drzewa urządzeń crDroid dla Poco X7 Pro (rodin)
+        # Pobranie drzewa urządzeń crDroid dla Poco X7 Pro (rodin)
         git clone https://github.com/crdroidandroid/android_device_xiaomi_rodin.git device/xiaomi/rodin --depth=1
 
-        # Dostosowanie konfiguracji pod profil omni_rodin
+        # Przygotowanie konfiguracji omni_rodin
         cd device/xiaomi/rodin
         sed -i '/FOX_/d' BoardConfig.mk || true
         sed -i '/OF_/d' BoardConfig.mk || true
         
-        # Tworzenie wymaganego pliku omni_rodin.mk z dowolnego pliku produktu w drzewie
-        TARGET_MK=$(ls *_rodin.mk 2>/dev/null | head -n 1)
-        if [ -n "$TARGET_MK" ]; then
-          cp "$TARGET_MK" omni_rodin.mk
-          sed -i 's/'"${TARGET_MK%.mk}"'/omni_rodin/g' omni_rodin.mk
+        # Generator omni_rodin.mk bez problematycznych znaków w YAML
+        if [ -f crdroid_rodin.mk ]; then
+          cp crdroid_rodin.mk omni_rodin.mk
         else
           cp BoardConfig.mk omni_rodin.mk
         fi
+        sed -i 's/crdroid_rodin/omni_rodin/g' omni_rodin.mk
 
-        # Regeneracja pliku AndroidProducts.mk dla lunch omni_rodin-eng
+        # Regeneracja pliku AndroidProducts.mk
         cat <<EOF > AndroidProducts.mk
 PRODUCT_MAKEFILES := \
     \$(LOCAL_DIR)/omni_rodin.mk
