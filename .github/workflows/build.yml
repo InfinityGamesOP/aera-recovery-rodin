@@ -52,10 +52,8 @@ jobs:
         fi
         sed -i 's/crdroid_rodin/omni_rodin/g' omni_rodin.mk
 
-        cat <<EOF > AndroidProducts.mk
-PRODUCT_MAKEFILES := \
-    \$(LOCAL_DIR)/omni_rodin.mk
-EOF
+        # Bezpieczne zapisanie AndroidProducts.mk bez błędów YAML
+        echo "PRODUCT_MAKEFILES := \$(LOCAL_DIR)/omni_rodin.mk" > AndroidProducts.mk
         cd ~/aera
 
         # Uruchomienie procedury budowania
