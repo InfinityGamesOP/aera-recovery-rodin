@@ -1,1 +1,58 @@
+name: Build AERA Recovery
 
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build AERA Recovery via GitHub Actions
+    runs-on: ubuntu-22.04
+
+    steps:
+    - name: Clean Up Environment
+      uses: rokibhasansagar/slimhub_actions@main
+
+    - name: Install Build Dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y git-core gnupg flex bison build-essential zip curl \
+        zlib1g-dev libc6-dev-i386 libn32ncurses5-dev x11proto-core-dev libx11-dev \
+        lib32z1-dev libgl1-mesa-dev libxml2-utils xsltproc unzip fontconfig cpio python3
+
+        mkdir -p ~/.bin
+        curl https://storage.googleapis.com/git-repo-downloads/repo > ~/.bin/repo
+        chmod a+x ~/.bin/repo
+
+    - name: Sync Sources & Build AERA Recovery
+      run: |
+        export PATH=~/.bin:$PATH
+        mkdir -p ~/aera && cd ~/aera
+
+        # Inicjalizacja bazy źródeł Android 14 (Omni/TWRP Manifest)
+        repo init -u https://gitlab.com/OrangeFox/Manifest.git -b fox_12.1 --depth=1
+        repo sync -c --no-clone-bundle --no-tags --optimized-fetch --prune -j$(nproc)
+
+        # Podmiana domyślnego recovery na silnik AERA (LVGL)
+        rm -rf bootable/recovery
+        git clone https://github.com/AERA-Recovery/android_bootable_recovery.git bootable/recovery --depth=1
+
+        # Pobranie wskazanego drzewa urządzeń crDroid dla Poco X7 Pro (rodin)
+        git clone https://github.com/crdroidandroid/android_device_xiaomi_rodin.git device/xiaomi/rodin --depth=1
+
+        # Automatyczne czyszczenie flag specyficznych dla innych custom recovery, jeśli występują
+        sed -i '/FOX_/d' device/xiaomi/rodin/BoardConfig.mk || true
+        sed -i '/OF_/d' device/xiaomi/rodin/BoardConfig.mk || true
+
+        # Uruchomienie procedury budowania
+        source build/envsetup.sh
+        export ALLOW_MISSING_DEPENDENCIES=true
+        lunch omni_rodin-eng
+        mka vendorbootimage -j$(nproc) || mka recoveryimage -j$(nproc)
+
+    - name: Upload Recovery Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: AERA_Recovery_Poco_X7_Pro
+        path: |
+          ~/aera/out/target/product/rodin/vendor_boot.img
+          ~/aera/out/target/product/rodin/recovery.img
