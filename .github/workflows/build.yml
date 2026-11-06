@@ -29,8 +29,8 @@ jobs:
         export PATH=~/.bin:$PATH
         mkdir -p ~/aera && cd ~/aera
 
-        # Inicjalizacja stabilnego manifestu OrangeFox/Omni dla Androida 14
-        repo init -u https://gitlab.com/OrangeFox/Manifest.git -b fox_14.0 --depth=1
+        # Inicjalizacja stabilnego manifestu Omni dla Androida 14
+        repo init -u https://github.com/minimal-manifest-twrp/platform_manifest_twrp_omni.git -b android-14.0 --depth=1
         repo sync -c --no-clone-bundle --no-tags --optimized-fetch --prune -j$(nproc)
 
         # Podmiana silnika recovery na AERA (LVGL)
@@ -45,7 +45,6 @@ jobs:
         sed -i '/FOX_/d' BoardConfig.mk || true
         sed -i '/OF_/d' BoardConfig.mk || true
         
-        # Automatyczne dopasowanie pliku makefile do profilu omni_rodin
         TARGET_MK=$(ls *.mk | grep -E 'crdroid|lineage|device' | head -n 1)
         if [ -n "$TARGET_MK" ]; then
           cp "$TARGET_MK" omni_rodin.mk
