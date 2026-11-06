@@ -29,8 +29,8 @@ jobs:
         export PATH=~/.bin:$PATH
         mkdir -p ~/aera && cd ~/aera
 
-        # Inicjalizacja bazy źródeł Android 12.1 (TWRP/Omni Manifest)
-        repo init -u https://github.com/minimal-manifest-twrp/platform_manifest_twrp_aosp.git -b twrp-12.1 --depth=1
+        # Inicjalizacja bazy źródeł Android 14 (zgodnej z drzewem crDroid dla Poco X7 Pro)
+        repo init -u https://github.com/minimal-manifest-twrp/platform_manifest_twrp_aosp.git -b twrp-14.0 --depth=1
         repo sync -c --no-clone-bundle --no-tags --optimized-fetch --prune -j$(nproc)
 
         # Podmiana silnika recovery na AERA (LVGL)
@@ -45,7 +45,6 @@ jobs:
         sed -i '/FOX_/d' BoardConfig.mk || true
         sed -i '/OF_/d' BoardConfig.mk || true
         
-        # Generator omni_rodin.mk bez problematycznych znaków w YAML
         if [ -f crdroid_rodin.mk ]; then
           cp crdroid_rodin.mk omni_rodin.mk
         else
@@ -53,7 +52,6 @@ jobs:
         fi
         sed -i 's/crdroid_rodin/omni_rodin/g' omni_rodin.mk
 
-        # Regeneracja pliku AndroidProducts.mk
         cat <<EOF > AndroidProducts.mk
 PRODUCT_MAKEFILES := \
     \$(LOCAL_DIR)/omni_rodin.mk
