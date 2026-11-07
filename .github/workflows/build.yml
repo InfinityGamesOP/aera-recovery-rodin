@@ -56,12 +56,10 @@ jobs:
         git clone https://github.com/LineageOS/android_hardware_mediatek.git hardware/mediatek --depth=1 || true
         git clone https://github.com/LineageOS/android_device_mediatek_sepolicy_vndr.git device/mediatek/sepolicy_vndr --depth=1 || true
 
-        # Usunięcie niekompatybilnych plików Android.bp powodujących błąd "select"
-        rm -f hardware/lineage/compat/Android.bp
-        rm -rf hardware/mediatek/wlan/libwifi-hal-wrapper/Android.bp
-        rm -rf hardware/mediatek/aidl/usb/Android.bp
-        rm -rf hardware/mediatek/libmtkperf_client/Android.bp
-        rm -rf hardware/mediatek/aidl/vibrator/Android.bp
+        # USUNIĘCIE WSZYSTKICH NIEKOMPATYBILNYCH PLIKÓW Android.bp powodujących błędy parsowania Soong
+        find device/xiaomi/rodin -name "Android.bp" -delete
+        find hardware/mediatek -name "Android.bp" -delete
+        find bootable/recovery -name "Android.bp" -delete
 
         # Tworzenie atrapy plików vendor i modułów jądra
         mkdir -p vendor/xiaomi/rodin
