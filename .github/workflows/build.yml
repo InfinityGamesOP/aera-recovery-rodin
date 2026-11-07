@@ -51,15 +51,13 @@ jobs:
         # Pobranie drzewa urządzeń dla Poco X7 Pro (rodin)
         git clone https://github.com/xiaomi-mt6899-dev/android_device_xiaomi_rodin.git device/xiaomi/rodin --depth=1
 
-        # Pobranie wymaganych zależności hardware i SEPolicy MediaTek
-        git clone https://github.com/LineageOS/android_hardware_lineage_compat.git hardware/lineage/compat --depth=1
+        # Pobranie wymaganych zależności sprzętowych
         git clone https://github.com/LineageOS/android_hardware_mediatek.git hardware/mediatek --depth=1 || true
         git clone https://github.com/LineageOS/android_device_mediatek_sepolicy_vndr.git device/mediatek/sepolicy_vndr --depth=1 || true
 
-        # USUNIĘCIE WSZYSTKICH NIEKOMPATYBILNYCH PLIKÓW Android.bp powodujących błędy parsowania Soong
-        find device/xiaomi/rodin -name "Android.bp" -delete
-        find hardware/mediatek -name "Android.bp" -delete
-        find bootable/recovery -name "Android.bp" -delete
+        # CAŁKOWITE USUNIĘCIE NIEKOMPATYBILNYCH KATALOGÓW I PLIKÓW Android.bp
+        rm -rf hardware/lineage/compat
+        find . -name "Android.bp" -delete
 
         # Tworzenie atrapy plików vendor i modułów jądra
         mkdir -p vendor/xiaomi/rodin
