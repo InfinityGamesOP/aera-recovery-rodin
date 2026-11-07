@@ -40,7 +40,7 @@ jobs:
         export PATH=~/.bin:$PATH
         mkdir -p ~/aera && cd ~/aera
 
-        # Inicjalizacja nowoczesnego manifestu LineageOS 21.0 (Android 14) kompatybilnego z drzewem rodin
+        # Inicjalizacja nowoczesnego manifestu LineageOS 21.0 (Android 14)
         repo init -u https://github.com/LineageOS/android.git -b lineage-21.0 --depth=1
         repo sync -c --no-clone-bundle --no-tags --optimized-fetch --prune -j$(nproc --all)
 
@@ -50,36 +50,32 @@ jobs:
 
         # Pobranie drzewa urządzeń dla Poco X7 Pro (rodin)
         git clone https://github.com/xiaomi-mt6899-dev/android_device_xiaomi_rodin.git device/xiaomi/rodin --depth=1
-
-        # Pobranie brakujących zależności jądra dla rodin (jeśli istnieją w oddzielnym repo)
         git clone https://github.com/xiaomi-mt6899-dev/android_device_xiaomi_rodin-kernel.git device/xiaomi/rodin-kernel --depth=1 || true
 
-        # Konfiguracja drzewa urządzenia pod recovery
+        # Konfiguracja i wykrycie poprawnego targetu lunch
         cd device/xiaomi/rodin
         sed -i '/FOX_/d' BoardConfig.mk || true
         sed -i '/OF_/d' BoardConfig.mk || true
 
-        # Tworzenie pliku omni_rodin.mk jeśli go brak
-        if [ ! -f omni_rodin.mk ]; then
-          TARGET_MK=$(ls *.mk | grep -E 'lineage|device' | head -n 1)
-          if [ -n "$TARGET_MK" ]; then
-            cp "$TARGET_MK" omni_rodin.mk
-          else
-            cp BoardConfig.mk omni_rodin.mk
-          fi
+        # Znajdź istniejący plik makefile urządzenia i utwórz z niego target lineage_rodin
+        ORIG_MK=$(ls *.mk | grep -E 'rodin|device' | head -n 1)
+        if [ -n "$ORIG_MK" ] && [ "$ORIG_MK" != "lineage_rodin.mk" ]; then
+          cp "$ORIG_MK" lineage_rodin.mk
+        elif [ ! -f lineage_rodin.mk ]; then
+          cp BoardConfig.mk lineage_rodin.mk
         fi
 
-        # Wymuszenie wpisów lunch w AndroidProducts.mk
-        echo -e "PRODUCT_MAKEFILES := \$(LOCAL_DIR)/omni_rodin.mk\nCOMMON_LUNCH_CHOICES := lineage_rodin-eng lineage_rodin-userdebug omni_rodin-eng omni_rodin-userdebug" > AndroidProducts.mk
+        # Zapewnienie poprawnych wpisów w AndroidProducts.mk
+        echo -e "PRODUCT_MAKEFILES := \$(LOCAL_DIR)/lineage_rodin.mk\nCOMMON_LUNCH_CHOICES := lineage_rodin-userdebug lineage_rodin-eng" > AndroidProducts.mk
 
         cd ~/aera
 
-        # Przygotowanie środowiska i kompilacja
+        # Przygotowanie środowiska i uruchomienie kompilacji
         source build/envsetup.sh
         export ALLOW_MISSING_DEPENDENCIES=true
         export LC_ALL=C
 
-        lunch lineage_rodin-userdebug || lunch omni_rodin-eng
+        lunch lineage_rodin-userdebug || lunch lineage_rodin-eng
 
         mka vendorbootimage -j$(nproc --all) || mka recoveryimage -j$(nproc --all)
 
