@@ -9,6 +9,17 @@ jobs:
     runs-on: ubuntu-22.04
 
     steps:
+    - name: Free Disk Space
+      uses: jlumbroso/free-disk-space@main
+      with:
+        tool-cache: true
+        android: true
+        dotnet: true
+        haskell: true
+        large-packages: true
+        docker-images: true
+        swap-storage: true
+
     - name: Clean Up Environment
       uses: rokibhasansagar/slimhub_actions@main
 
@@ -18,7 +29,7 @@ jobs:
         sudo apt-get install -y git-core gnupg flex bison build-essential zip curl \
         zlib1g-dev libc6-dev-i386 libncurses5-dev libncurses5 libncurses-dev \
         g++-multilib gcc-multilib x11proto-core-dev libx11-dev lib32z1-dev \
-        libgl1-mesa-dev libxml2-utils xsltproc unzip fontconfig cpio python3
+        libgl1-mesa-dev libxml2-utils xsltproc unzip fontconfig cpio python3 python-is-python3
 
         mkdir -p ~/.bin
         curl https://storage.googleapis.com/git-repo-downloads/repo > ~/.bin/repo
@@ -29,43 +40,50 @@ jobs:
         export PATH=~/.bin:$PATH
         mkdir -p ~/aera && cd ~/aera
 
-        # Inicjalizacja bazy źródeł TWRP/AOSP
+        # Inicjalizacja bazy źródeł TWRP/AOSP 12.1
         repo init -u https://github.com/minimal-manifest-twrp/platform_manifest_twrp_aosp.git -b twrp-12.1 --depth=1
-        repo sync -c --no-clone-bundle --no-tags --optimized-fetch --prune -j$(nproc)
+        repo sync -c --no-clone-bundle --no-tags --optimized-fetch --prune -j$(nproc --all)
 
-        # Podmiana silnika recovery na AERA (LVGL)
+        # Podmiana silnika recovery na AERA
         rm -rf bootable/recovery
         git clone https://github.com/AERA-Recovery/android_bootable_recovery.git bootable/recovery --depth=1
 
         # Pobranie drzewa urządzeń dla Poco X7 Pro (rodin)
         git clone https://github.com/xiaomi-mt6899-dev/android_device_xiaomi_rodin.git device/xiaomi/rodin --depth=1
 
-        # Pobranie brakującej zależności Lineage compatibility
+        # Pobranie wymaganych zależności systemowych/hardware
         git clone https://github.com/LineageOS/android_hardware_lineage_compat.git hardware/lineage/compat --depth=1
 
-        # Przygotowanie konfiguracji omni_rodin
+        # Konfiguracja drzewa pod build omni/twrp
         cd device/xiaomi/rodin
         sed -i '/FOX_/d' BoardConfig.mk || true
         sed -i '/OF_/d' BoardConfig.mk || true
         
-        TARGET_MK=$(ls *.mk | grep -E 'crdroid|lineage|device' | head -n 1)
-        if [ -n "$TARGET_MK" ]; then
-          cp "$TARGET_MK" omni_rodin.mk
-        else
-          cp BoardConfig.mk omni_rodin.mk
+        # Tworzenie omni_rodin.mk jeśli nie istnieje
+        if [ ! -f omni_rodin.mk ]; then
+          TARGET_MK=$(ls *.mk | grep -E 'crdroid|lineage|device' | head -n 1)
+          if [ -n "$TARGET_MK" ]; then
+            cp "$TARGET_MK" omni_rodin.mk
+          else
+            cp BoardConfig.mk omni_rodin.mk
+          fi
+          sed -i 's/crdroid_rodin/omni_rodin/g' omni_rodin.mk || true
+          sed -i 's/lineage_rodin/omni_rodin/g' omni_rodin.mk || true
         fi
-        sed -i 's/crdroid_rodin/omni_rodin/g' omni_rodin.mk || true
-        sed -i 's/lineage_rodin/omni_rodin/g' omni_rodin.mk || true
 
-        # Zapisanie pliku AndroidProducts.mk
-        echo "PRODUCT_MAKEFILES := \$(LOCAL_DIR)/omni_rodin.mk" > AndroidProducts.mk
+        # Wymuszenie poprawnej ścieżki w AndroidProducts.mk
+        echo -e "PRODUCT_MAKEFILES := \$(LOCAL_DIR)/omni_rodin.mk\nCOMMON_LUNCH_CHOICES := omni_rodin-eng omni_rodin-userdebug" > AndroidProducts.mk
+        
         cd ~/aera
 
-        # Uruchomienie budowania
+        # Przygotowanie środowiska i kompilacja
         source build/envsetup.sh
         export ALLOW_MISSING_DEPENDENCIES=true
-        lunch omni_rodin-eng
-        mka vendorbootimage -j$(nproc) || mka recoveryimage -j$(nproc)
+        export LC_ALL=C
+        
+        lunch omni_rodin-eng || lunch omni_rodin-userdebug
+        
+        mka vendorbootimage -j$(nproc --all) || mka recoveryimage -j$(nproc --all)
 
     - name: Upload Recovery Artifact
       uses: actions/upload-artifact@v4
@@ -74,3 +92,4 @@ jobs:
         path: |
           ~/aera/out/target/product/rodin/vendor_boot.img
           ~/aera/out/target/product/rodin/recovery.img
+        if-no-files-found: warn
