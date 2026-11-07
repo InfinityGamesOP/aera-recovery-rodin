@@ -48,6 +48,10 @@ jobs:
         rm -rf bootable/recovery
         git clone https://github.com/AERA-Recovery/android_bootable_recovery.git bootable/recovery --depth=1
 
+        # POPRAWKA: Utworzenie brakującego katalogu czcionek/zasobów w kodzie AERA przed kompilacją
+        mkdir -p bootable/recovery/gui/theme/common/fonts
+        mkdir -p recovery
+
         # Pobranie drzewa urządzeń dla Poco X7 Pro (rodin)
         git clone https://github.com/xiaomi-mt6899-dev/android_device_xiaomi_rodin.git device/xiaomi/rodin --depth=1
         git clone https://github.com/xiaomi-mt6899-dev/android_device_xiaomi_rodin-kernel.git device/xiaomi/rodin-kernel --depth=1 || true
@@ -75,7 +79,7 @@ jobs:
 
         cd ~/aera
 
-        # Przygotowanie środowiska, ustawienie wymaganej konfiguracji release i kompilacja
+        # Przygotowanie środowiska i kompilacja
         source build/envsetup.sh
         export ALLOW_MISSING_DEPENDENCIES=true
         export LC_ALL=C
