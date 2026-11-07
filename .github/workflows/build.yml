@@ -16,6 +16,14 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
+      - name: Utworzenie pliku SWAP (zwiększenie RAM do 16GB)
+        run: |
+          sudo fallocate -l 16G /swapfile
+          sudo chmod 600 /swapfile
+          sudo mkswap /swapfile
+          sudo swapon /swapfile
+          free -h
+
       - name: Maksymalizacja wolnego miejsca na dysku
         uses: jlumbroso/free-disk-space@main
         with:
@@ -25,7 +33,7 @@ jobs:
           haskell: true
           large-packages: true
           docker-images: true
-          swap-storage: true
+          swap-storage: false
 
       - name: Instalacja zależności systemowych
         run: |
@@ -69,14 +77,16 @@ jobs:
         run: |
           cd ~/aera-workspace
           export ALLOW_MISSING_DEPENDENCIES=true
-          export TARGET_RELEASE=ap3a
+          export SOONG_GEN_COMPDB=0
+          export USE_CCACHE=1
+          export CCACHE_EXEC=/usr/bin/ccache
           
           source build/envsetup.sh
           
-          # Wywołanie lunch w trybie ap3a dla Android 15/16
-          lunch twrp_rodin-ap3a-userdebug || lunch twrp_rodin-ap3a-eng || lunch aera_rodin-ap3a-userdebug || lunch omni_rodin-ap3a-eng
+          # Wywołanie lunch dopasowujące się do wpisów w device tree
+          lunch twrp_rodin-ap3a-userdebug || lunch twrp_rodin-ap3a-eng || lunch aera_rodin-ap3a-userdebug || lunch omni_rodin-ap3a-eng || lunch twrp_rodin-eng
           
-          mka recoveryimage vendor_bootimage
+          mka -j2 recoveryimage vendor_bootimage
 
       - name: Przesłanie artefaktów wynikowych
         uses: actions/upload-artifact@v4
