@@ -11,7 +11,7 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-26.04
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
@@ -74,6 +74,11 @@ jobs:
         run: |
           cd ~/aera-workspace
           git clone https://github.com/KSN2redawew/android_device_xiaomi_rodin-twrp device/xiaomi/rodin || true
+
+      - name: Usunięcie konfliktowych prebuiltów APEX dla Recovery
+        run: |
+          cd ~/aera-workspace
+          rm -rf prebuilts/module_sdk/CrashRecovery || true
 
       - name: Budowanie Recovery (MediaTek / rodin)
         run: |
