@@ -40,7 +40,7 @@ jobs:
         export PATH=~/.bin:$PATH
         mkdir -p ~/aera && cd ~/aera
 
-        # Inicjalizacja nowoczesnego manifestu LineageOS 21.0 (Android 14)
+        # Inicjalizacja bazy źródeł LineageOS 21.0
         repo init -u https://github.com/LineageOS/android.git -b lineage-21.0 --depth=1
         repo sync -c --no-clone-bundle --no-tags --optimized-fetch --prune -j$(nproc --all)
 
@@ -48,13 +48,17 @@ jobs:
         rm -rf bootable/recovery
         git clone https://github.com/AERA-Recovery/android_bootable_recovery.git bootable/recovery --depth=1
 
-        # POPRAWKA: Utworzenie brakującego katalogu czcionek/zasobów w kodzie AERA przed kompilacją
+        # POPRAWKA 1: Pre-creation folderów czcionek i nadanie praw w całym projekcie
         mkdir -p bootable/recovery/gui/theme/common/fonts
         mkdir -p recovery
+        chmod -R 777 bootable/recovery
 
         # Pobranie drzewa urządzeń dla Poco X7 Pro (rodin)
         git clone https://github.com/xiaomi-mt6899-dev/android_device_xiaomi_rodin.git device/xiaomi/rodin --depth=1
         git clone https://github.com/xiaomi-mt6899-dev/android_device_xiaomi_rodin-kernel.git device/xiaomi/rodin-kernel --depth=1 || true
+
+        # POPRAWKA 2: Usunięcie ze skryptów AERA sztywnych prób tworzenia folderów "mkdir recovery"
+        find bootable/recovery -type f \( -name "*.mk" -o -name "*.bp" -o -name "*.sh" \) -exec sed -i 's/mkdir recovery/mkdir -p bootable\/recovery\/gui/g' {} + || true
 
         # Konfiguracja drzewa urządzenia
         cd device/xiaomi/rodin
@@ -79,11 +83,13 @@ jobs:
 
         cd ~/aera
 
-        # Przygotowanie środowiska i kompilacja
+        # POPRAWKA 3: Wyłączenie piaskownicy ścieżek Soong zapobiegające błędowi read-only file system
         source build/envsetup.sh
         export ALLOW_MISSING_DEPENDENCIES=true
         export LC_ALL=C
         export TARGET_RELEASE=ap2a
+        export TEMPORARY_DISABLE_PATH_RESTRICTIONS=true
+        export BUILD_BROKEN_MISSING_BUILD_REQUIREMENTS=true
 
         lunch lineage_rodin-ap2a-userdebug || lunch lineage_rodin-ap2a-eng || true
 
