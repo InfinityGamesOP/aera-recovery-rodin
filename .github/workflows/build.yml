@@ -69,15 +69,12 @@ jobs:
         run: |
           cd ~/aera-workspace
           export ALLOW_MISSING_DEPENDENCIES=true
+          export TARGET_RELEASE=ap3a
+          
           source build/envsetup.sh
           
-          # Automatyczne wykrycie zdefiniowanego lunch targetu z AndroidProducts.mk lub fabrycznych definicji
-          TARGET=$(grep -E 'PRODUCT_MAKEFILES' device/xiaomi/rodin/AndroidProducts.mk -A 5 2>/dev/null | grep -oE '[a-zA-Z0-0_]+_rodin' | head -n 1 || echo "twrp_rodin")
-          
-          echo "Wykryto cel budowania: $TARGET"
-          
-          # Próba wywołania w nowym oraz tradycyjnym formacie lunch
-          lunch ${TARGET}-trunk_staging-userdebug || lunch ${TARGET}-userdebug || lunch omni_rodin-eng || lunch twrp_rodin-eng
+          # Wywołanie lunch w trybie ap3a dla Android 15/16
+          lunch twrp_rodin-ap3a-userdebug || lunch twrp_rodin-ap3a-eng || lunch aera_rodin-ap3a-userdebug || lunch omni_rodin-ap3a-eng
           
           mka recoveryimage vendor_bootimage
 
