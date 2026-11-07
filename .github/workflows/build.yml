@@ -51,39 +51,47 @@ jobs:
         # Pobranie drzewa urządzeń dla Poco X7 Pro (rodin)
         git clone https://github.com/xiaomi-mt6899-dev/android_device_xiaomi_rodin.git device/xiaomi/rodin --depth=1
 
-        # Pobranie wymaganych zależności hardware/Lineage (klonowanie domyślnej/właściwej gałęzi)
+        # Pobranie wymaganych zależności hardware
         git clone https://github.com/LineageOS/android_hardware_lineage_compat.git hardware/lineage/compat --depth=1
-        git clone https://github.com/LineageOS/android_hardware_mediatek.git -b lineage-19.1 hardware/mediatek --depth=1 || git clone https://github.com/LineageOS/android_hardware_mediatek.git hardware/mediatek --depth=1
+        git clone https://github.com/LineageOS/android_hardware_mediatek.git hardware/mediatek --depth=1 || true
+
+        # Stworzenie pustego katalogu/pliku vendor, aby zapobiec błędowi missing vendor.mk
+        mkdir -p vendor/xiaomi/rodin
+        echo '# Dummy vendor makefile for recovery build' > vendor/xiaomi/rodin/rodin-vendor.mk
 
         # Konfiguracja drzewa pod build omni/twrp
         cd device/xiaomi/rodin
+        
+        # Usuwanie odwołań do customowych modułów i vendor.mk, jeśli istnieją
         sed -i '/FOX_/d' BoardConfig.mk || true
         sed -i '/OF_/d' BoardConfig.mk || true
-        
-        # Tworzenie omni_rodin.mk jeśli nie istnieje
-        if [ ! -f omni_rodin.mk ]; then
-          TARGET_MK=$(ls *.mk | grep -E 'crdroid|lineage|device' | head -n 1)
-          if [ -n "$TARGET_MK" ]; then
-            cp "$TARGET_MK" omni_rodin.mk
-          else
-            cp BoardConfig.mk omni_rodin.mk
-          fi
-          sed -i 's/crdroid_rodin/omni_rodin/g' omni_rodin.mk || true
-          sed -i 's/lineage_rodin/omni_rodin/g' omni_rodin.mk || true
+        sed -i '/vendor\/xiaomi\/rodin/d' *.mk || true
+
+        # Tworzenie omni_rodin.mk
+        TARGET_MK=$(ls *.mk | grep -E 'crdroid|lineage|device' | head -n 1)
+        if [ -n "$TARGET_MK" ]; then
+          cp "$TARGET_MK" omni_rodin.mk
+        else
+          cp BoardConfig.mk omni_rodin.mk
         fi
 
-        # Wymuszenie poprawnej ścieżki w AndroidProducts.mk
+        # Czyszczenie i podstawianie zmiennych nazewnictwa
+        sed -i 's/crdroid_rodin/omni_rodin/g' omni_rodin.mk || true
+        sed -i 's/lineage_rodin/omni_rodin/g' omni_rodin.mk || true
+        sed -i '/vendor\/xiaomi\/rodin/d' omni_rodin.mk || true
+
+        # Utworzenie AndroidProducts.mk
         echo -e "PRODUCT_MAKEFILES := \$(LOCAL_DIR)/omni_rodin.mk\nCOMMON_LUNCH_CHOICES := omni_rodin-eng omni_rodin-userdebug" > AndroidProducts.mk
-        
+
         cd ~/aera
 
-        # Przygotowanie środowiska i kompilacja
+        # Przygotowanie środowiska i uruchomienie builda
         source build/envsetup.sh
         export ALLOW_MISSING_DEPENDENCIES=true
         export LC_ALL=C
-        
+
         lunch omni_rodin-eng || lunch omni_rodin-userdebug
-        
+
         mka vendorbootimage -j$(nproc --all) || mka recoveryimage -j$(nproc --all)
 
     - name: Upload Recovery Artifact
