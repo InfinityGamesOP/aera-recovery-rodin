@@ -40,7 +40,7 @@ jobs:
         export PATH=~/.bin:$PATH
         mkdir -p ~/aera && cd ~/aera
 
-        # Inicjalizacja stabilniejszego manifestu OmniROM 12.1/13.0
+        # Inicjalizacja bazy źródeł TWRP/AOSP 12.1
         repo init -u https://github.com/minimal-manifest-twrp/platform_manifest_twrp_aosp.git -b twrp-12.1 --depth=1
         repo sync -c --no-clone-bundle --no-tags --optimized-fetch --prune -j$(nproc --all)
 
@@ -55,6 +55,13 @@ jobs:
         git clone https://github.com/LineageOS/android_hardware_lineage_compat.git hardware/lineage/compat --depth=1
         git clone https://github.com/LineageOS/android_hardware_mediatek.git hardware/mediatek --depth=1 || true
         git clone https://github.com/LineageOS/android_device_mediatek_sepolicy_vndr.git device/mediatek/sepolicy_vndr --depth=1 || true
+
+        # Usunięcie niekompatybilnych plików Android.bp powodujących błąd "select"
+        rm -f hardware/lineage/compat/Android.bp
+        rm -rf hardware/mediatek/wlan/libwifi-hal-wrapper/Android.bp
+        rm -rf hardware/mediatek/aidl/usb/Android.bp
+        rm -rf hardware/mediatek/libmtkperf_client/Android.bp
+        rm -rf hardware/mediatek/aidl/vibrator/Android.bp
 
         # Tworzenie atrapy plików vendor i modułów jądra
         mkdir -p vendor/xiaomi/rodin
@@ -76,7 +83,6 @@ jobs:
         sed -i '/vendor\/xiaomi\/rodin/d' BoardConfig.mk || true
         sed -i '/sepolicy_vndr/d' BoardConfig.mk || true
         
-        # Poprawka nieznanej architektury armv9-a na bezpieczną armv8-a / armv8-2a
         sed -i 's/armv9-a/armv8-2a/g' BoardConfig.mk || true
         sed -i 's/armv9/armv8/g' BoardConfig.mk || true
 
