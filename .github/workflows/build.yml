@@ -16,11 +16,11 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Utworzenie pliku SWAP (zwiększenie RAM do 16GB)
+      - name: Utworzenie pliku SWAP (zwiększenie RAM do 32GB)
         run: |
           sudo swapoff -a || true
-          sudo rm -f /swapfile ~/swapfile
-          sudo dd if=/dev/zero of=/mnt/swapfile bs=1M count=16384 status=progress
+          sudo rm -f /swapfile ~/swapfile /mnt/swapfile
+          sudo fallocate -l 32G /mnt/swapfile || sudo dd if=/dev/zero of=/mnt/swapfile bs=1M count=32768 status=progress
           sudo chmod 600 /mnt/swapfile
           sudo mkswap /mnt/swapfile
           sudo swapon /mnt/swapfile
@@ -92,7 +92,8 @@ jobs:
           
           lunch twrp_rodin-ap3a-userdebug || lunch twrp_rodin-ap3a-eng || lunch aera_rodin-ap3a-userdebug || lunch omni_rodin-ap3a-eng || lunch twrp_rodin-eng
           
-          mka -j2 recoveryimage vendor_bootimage
+          # Użycie -j1 zapobiega przepełnieniu pamięci RAM podczas kompilacji Soong/Ninja
+          mka -j1 recoveryimage vendor_bootimage
 
       - name: Przesłanie artefaktów wynikowych
         uses: actions/upload-artifact@v4
