@@ -43,7 +43,7 @@ jobs:
         # 1. Inicjalizacja bazy źródeł LineageOS 21.0 (Android 14)
         repo init -u https://github.com/LineageOS/android.git -b lineage-21.0 --depth=1
 
-        # 2. Utworzenie local_manifest z poprawnymi, kompletnymi repozytoriami
+        # 2. Utworzenie local_manifest bez dublowania ścieżek z oficjalnego manifestu
         mkdir -p .repo/local_manifests
         cat << 'EOF' > .repo/local_manifests/rodin.xml
         <?xml version="1.0" encoding="UTF-8"?>
@@ -51,7 +51,6 @@ jobs:
           <project path="device/xiaomi/rodin" name="xiaomi-mt6899-dev/android_device_xiaomi_rodin" remote="github" revision="main" />
           <project path="device/xiaomi/rodin-kernel" name="xiaomi-mt6899-dev/android_device_xiaomi_rodin-kernel" remote="github" revision="main" />
           <project path="hardware/mediatek" name="LineageOS/android_hardware_mediatek" remote="github" revision="lineage-21.0" />
-          <project path="hardware/lineage/compat" name="LineageOS/android_hardware_lineage_compat" remote="github" revision="lineage-21.0" />
           <project path="device/mediatek/sepolicy_vndr" name="LineageOS/android_device_mediatek_sepolicy_vndr" remote="github" revision="lineage-21.0" />
         </manifest>
         EOF
@@ -59,24 +58,28 @@ jobs:
         # 3. Synchronizacja kodu
         repo sync -c --no-clone-bundle --no-tags --optimized-fetch --prune -j$(nproc --all)
 
-        # 4. Podmiana silnika recovery na AERA
+        # 4. Usunięcie niekompatybilnych plików Android.bp w modułach sprzętowych
+        find hardware/mediatek -name "Android.bp" -delete || true
+        rm -f hardware/lineage/compat/Android.bp || true
+
+        # 5. Podmiana silnika recovery na AERA
         rm -rf bootable/recovery
         git clone https://github.com/AERA-Recovery/android_bootable_recovery.git bootable/recovery --depth=1
 
-        # POPRAWKA ZASOBÓW AERA: Tworzenie folderów i usunięcie błędnych wywołań mkdir
+        # Fix zasobów i uprawnień AERA
         mkdir -p bootable/recovery/gui/theme/common/fonts
         mkdir -p recovery
         chmod -R 777 bootable/recovery
         find bootable/recovery -type f \( -name "*.mk" -o -name "*.bp" -o -name "*.sh" \) -exec sed -i 's/mkdir recovery/mkdir -p bootable\/recovery\/gui/g' {} + || true
 
-        # POPRAWKA ARCHITEKTURY I STYLÓW DRZEWA
+        # Fix architektury pod rodin
         cd device/xiaomi/rodin
         sed -i '/FOX_/d' BoardConfig.mk || true
         sed -i '/OF_/d' BoardConfig.mk || true
         sed -i 's/armv9-a/armv8-2a/g' BoardConfig.mk || true
         sed -i 's/armv9/armv8/g' BoardConfig.mk || true
 
-        # Przygotowanie plików produktowych pod Lineage / AERA
+        # Przygotowanie plików makefile
         PROD_MK=$(ls *.mk | grep -E 'rodin|device|lineage' | head -n 1)
         if [ -n "$PROD_MK" ]; then
           cp "$PROD_MK" lineage_rodin.mk
@@ -95,17 +98,15 @@ jobs:
 
         cd ~/aera
 
-        # 5. Konfiguracja środowiska kompilacji dla Androida 14
+        # 6. Kompilacja
         source build/envsetup.sh
         export ALLOW_MISSING_DEPENDENCIES=true
         export LC_ALL=C
         export TARGET_RELEASE=ap2a
         export BUILD_BROKEN_MISSING_BUILD_REQUIREMENTS=true
 
-        # Wybór targetu kompilacji
         lunch lineage_rodin-ap2a-userdebug || lunch lineage_rodin-ap2a-eng
 
-        # Kompilacja obrazu recovery / vendor_boot
         mka vendorbootimage -j$(nproc --all) || mka recoveryimage -j$(nproc --all)
 
     - name: Upload Recovery Artifact
