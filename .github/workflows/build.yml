@@ -48,7 +48,10 @@ jobs:
         rm -rf bootable/recovery
         git clone https://github.com/AERA-Recovery/android_bootable_recovery.git bootable/recovery --depth=1
 
-        # POPRAWKA 1: Pre-creation folderów czcionek i nadanie praw w całym projekcie
+        # Pobranie brakującego sprzętu MediaTek wymaganego przez drzewo rodin
+        git clone https://github.com/LineageOS/android_hardware_mediatek.git -b lineage-21.0 hardware/mediatek --depth=1 || git clone https://github.com/LineageOS/android_hardware_mediatek.git hardware/mediatek --depth=1
+
+        # Pre-creation folderów czcionek i nadanie praw
         mkdir -p bootable/recovery/gui/theme/common/fonts
         mkdir -p recovery
         chmod -R 777 bootable/recovery
@@ -57,7 +60,7 @@ jobs:
         git clone https://github.com/xiaomi-mt6899-dev/android_device_xiaomi_rodin.git device/xiaomi/rodin --depth=1
         git clone https://github.com/xiaomi-mt6899-dev/android_device_xiaomi_rodin-kernel.git device/xiaomi/rodin-kernel --depth=1 || true
 
-        # POPRAWKA 2: Usunięcie ze skryptów AERA sztywnych prób tworzenia folderów "mkdir recovery"
+        # Usunięcie ze skryptów AERA sztywnych prób tworzenia folderów "mkdir recovery"
         find bootable/recovery -type f \( -name "*.mk" -o -name "*.bp" -o -name "*.sh" \) -exec sed -i 's/mkdir recovery/mkdir -p bootable\/recovery\/gui/g' {} + || true
 
         # Konfiguracja drzewa urządzenia
@@ -83,12 +86,11 @@ jobs:
 
         cd ~/aera
 
-        # POPRAWKA 3: Wyłączenie piaskownicy ścieżek Soong zapobiegające błędowi read-only file system
+        # Przygotowanie środowiska i kompilacja z poprawnymi zmiennymi
         source build/envsetup.sh
         export ALLOW_MISSING_DEPENDENCIES=true
         export LC_ALL=C
         export TARGET_RELEASE=ap2a
-        export TEMPORARY_DISABLE_PATH_RESTRICTIONS=true
         export BUILD_BROKEN_MISSING_BUILD_REQUIREMENTS=true
 
         lunch lineage_rodin-ap2a-userdebug || lunch lineage_rodin-ap2a-eng || true
