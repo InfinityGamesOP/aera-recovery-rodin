@@ -62,25 +62,28 @@ jobs:
         # Konfiguracja drzewa pod build omni/twrp
         cd device/xiaomi/rodin
         
-        # Usuwanie odwołań do customowych modułów i vendor.mk, jeśli istnieją
         sed -i '/FOX_/d' BoardConfig.mk || true
         sed -i '/OF_/d' BoardConfig.mk || true
         sed -i '/vendor\/xiaomi\/rodin/d' *.mk || true
 
-        # Tworzenie omni_rodin.mk
-        TARGET_MK=$(ls *.mk | grep -E 'crdroid|lineage|device' | head -n 1)
-        if [ -n "$TARGET_MK" ]; then
-          cp "$TARGET_MK" omni_rodin.mk
-        else
-          cp BoardConfig.mk omni_rodin.mk
-        fi
+        # Tworzenie czystego pliku omni_rodin.mk z wymaganymi zmiennymi
+        cat << 'EOF' > omni_rodin.mk
+        LOCAL_DIR := device/xiaomi/rodin
 
-        # Czyszczenie i podstawianie zmiennych nazewnictwa
-        sed -i 's/crdroid_rodin/omni_rodin/g' omni_rodin.mk || true
-        sed -i 's/lineage_rodin/omni_rodin/g' omni_rodin.mk || true
-        sed -i '/vendor\/xiaomi\/rodin/d' omni_rodin.mk || true
+        $(call inherit-product, $(SRC_TARGET_DIR)/product/full_base_telephony.mk)
+        $(call inherit-product, $(SRC_TARGET_DIR)/product/core_64_bit.mk)
 
-        # Utworzenie AndroidProducts.mk
+        # Wymagane zmienne AOSP Product
+        PRODUCT_NAME := omni_rodin
+        PRODUCT_DEVICE := rodin
+        PRODUCT_MANUFACTURER := xiaomi
+        PRODUCT_BRAND := Xiaomi
+        PRODUCT_MODEL := Poco X7 Pro
+
+        PRODUCT_GMS_CLIENTID_BASE := android-xiaomi
+        EOF
+
+        # Wymuszenie poprawnej ścieżki w AndroidProducts.mk
         echo -e "PRODUCT_MAKEFILES := \$(LOCAL_DIR)/omni_rodin.mk\nCOMMON_LUNCH_CHOICES := omni_rodin-eng omni_rodin-userdebug" > AndroidProducts.mk
 
         cd ~/aera
