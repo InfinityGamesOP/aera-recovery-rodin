@@ -51,29 +51,40 @@ jobs:
         # Pobranie drzewa urządzeń dla Poco X7 Pro (rodin)
         git clone https://github.com/xiaomi-mt6899-dev/android_device_xiaomi_rodin.git device/xiaomi/rodin --depth=1
 
-        # Pobranie wymaganych zależności hardware
+        # Pobranie wymaganych zależności hardware i SEPolicy MediaTek
         git clone https://github.com/LineageOS/android_hardware_lineage_compat.git hardware/lineage/compat --depth=1
         git clone https://github.com/LineageOS/android_hardware_mediatek.git hardware/mediatek --depth=1 || true
+        git clone https://github.com/LineageOS/android_device_mediatek_sepolicy_vndr.git device/mediatek/sepolicy_vndr --depth=1 || true
 
-        # Stworzenie pustego katalogu/pliku vendor, aby zapobiec błędowi missing vendor.mk
+        # Atrapa katalogu/pliku vendor oraz zaleznosci SEPolicy
         mkdir -p vendor/xiaomi/rodin
-        echo '# Dummy vendor makefile for recovery build' > vendor/xiaomi/rodin/rodin-vendor.mk
+        echo '# Dummy vendor makefile' > vendor/xiaomi/rodin/rodin-vendor.mk
+        mkdir -p device/mediatek/sepolicy_vndr
+        touch device/mediatek/sepolicy_vndr/SEPolicy.mk
+
+        # Tworzenie atrapy brakujących plików modułów jądra
+        mkdir -p device/xiaomi/rodin-kernel
+        touch device/xiaomi/rodin-kernel/modules.load.system
+        touch device/xiaomi/rodin-kernel/modules.load.vendor
+        touch device/xiaomi/rodin-kernel/modules.load.vendor_ramdisk
+        touch device/xiaomi/rodin-kernel/modules.load.recovery
 
         # Konfiguracja drzewa pod build omni/twrp
         cd device/xiaomi/rodin
         
+        # Usunięcie odwołań blokujących kompilację recovery
         sed -i '/FOX_/d' BoardConfig.mk || true
         sed -i '/OF_/d' BoardConfig.mk || true
-        sed -i '/vendor\/xiaomi\/rodin/d' *.mk || true
+        sed -i '/vendor\/xiaomi\/rodin/d' BoardConfig.mk || true
+        sed -i '/sepolicy_vndr/d' BoardConfig.mk || true
 
-        # Tworzenie czystego pliku omni_rodin.mk z wymaganymi zmiennymi
+        # Tworzenie pliku omni_rodin.mk
         cat << 'EOF' > omni_rodin.mk
         LOCAL_DIR := device/xiaomi/rodin
 
         $(call inherit-product, $(SRC_TARGET_DIR)/product/full_base_telephony.mk)
         $(call inherit-product, $(SRC_TARGET_DIR)/product/core_64_bit.mk)
 
-        # Wymagane zmienne AOSP Product
         PRODUCT_NAME := omni_rodin
         PRODUCT_DEVICE := rodin
         PRODUCT_MANUFACTURER := xiaomi
@@ -83,12 +94,12 @@ jobs:
         PRODUCT_GMS_CLIENTID_BASE := android-xiaomi
         EOF
 
-        # Wymuszenie poprawnej ścieżki w AndroidProducts.mk
+        # Utworzenie AndroidProducts.mk
         echo -e "PRODUCT_MAKEFILES := \$(LOCAL_DIR)/omni_rodin.mk\nCOMMON_LUNCH_CHOICES := omni_rodin-eng omni_rodin-userdebug" > AndroidProducts.mk
 
         cd ~/aera
 
-        # Przygotowanie środowiska i uruchomienie builda
+        # Przygotowanie środowiska i uruchomienie kompilacji
         source build/envsetup.sh
         export ALLOW_MISSING_DEPENDENCIES=true
         export LC_ALL=C
