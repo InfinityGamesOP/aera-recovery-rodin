@@ -52,31 +52,40 @@ jobs:
         git clone https://github.com/xiaomi-mt6899-dev/android_device_xiaomi_rodin.git device/xiaomi/rodin --depth=1
         git clone https://github.com/xiaomi-mt6899-dev/android_device_xiaomi_rodin-kernel.git device/xiaomi/rodin-kernel --depth=1 || true
 
-        # Konfiguracja i wykrycie poprawnego targetu lunch
+        # Konfiguracja drzewa urządzenia
         cd device/xiaomi/rodin
         sed -i '/FOX_/d' BoardConfig.mk || true
         sed -i '/OF_/d' BoardConfig.mk || true
 
-        # Znajdź istniejący plik makefile urządzenia i utwórz z niego target lineage_rodin
-        ORIG_MK=$(ls *.mk | grep -E 'rodin|device' | head -n 1)
-        if [ -n "$ORIG_MK" ] && [ "$ORIG_MK" != "lineage_rodin.mk" ]; then
-          cp "$ORIG_MK" lineage_rodin.mk
-        elif [ ! -f lineage_rodin.mk ]; then
+        # Automatyczne wykrycie i przemianowanie głównego pliku makefile na zgodny z device
+        PROD_MK=$(ls *.mk | grep -E 'rodin|device|lineage' | head -n 1)
+        if [ -n "$PROD_MK" ]; then
+          cp "$PROD_MK" lineage_rodin.mk
+        else
           cp BoardConfig.mk lineage_rodin.mk
         fi
 
-        # Zapewnienie poprawnych wpisów w AndroidProducts.mk
-        echo -e "PRODUCT_MAKEFILES := \$(LOCAL_DIR)/lineage_rodin.mk\nCOMMON_LUNCH_CHOICES := lineage_rodin-userdebug lineage_rodin-eng" > AndroidProducts.mk
+        # Poprawne zdefiniowanie AndroidProducts.mk powiązanego z drzewem
+        cat << 'EOF' > AndroidProducts.mk
+        PRODUCT_MAKEFILES := \
+            $(LOCAL_DIR)/lineage_rodin.mk
+
+        COMMON_LUNCH_CHOICES := \
+            lineage_rodin-userdebug \
+            lineage_rodin-eng
+        EOF
 
         cd ~/aera
 
-        # Przygotowanie środowiska i uruchomienie kompilacji
+        # Przygotowanie środowiska i kompilacja
         source build/envsetup.sh
         export ALLOW_MISSING_DEPENDENCIES=true
         export LC_ALL=C
 
-        lunch lineage_rodin-userdebug || lunch lineage_rodin-eng
+        # Sprawdzenie dostępnych targetów i uruchomienie builda
+        lunch lineage_rodin-userdebug || lunch lineage_rodin-eng || true
 
+        # Fallback – jeśli lunch nie zadziała automatycznie, spróbujemy wywołać bezpośrednio kompilację recovery
         mka vendorbootimage -j$(nproc --all) || mka recoveryimage -j$(nproc --all)
 
     - name: Upload Recovery Artifact
