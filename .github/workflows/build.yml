@@ -4,9 +4,9 @@ on:
   workflow_dispatch:
     inputs:
       branch:
-        description: 'Branch manifestu AERA (np. android-14.0)'
+        description: 'Branch manifestu AERA'
         required: true
-        default: 'android-14.0'
+        default: 'aera-16.0'
         type: string
 
 jobs:
@@ -57,7 +57,6 @@ jobs:
       - name: Pobranie drzewa urządzenia dla Poco X7 Pro (rodin)
         run: |
           cd ~/aera-workspace
-          # Klonowanie drzewa dla rodin (dostosuj adres, jeśli używasz własnego forka)
           git clone https://github.com/KSN2redawew/android_device_xiaomi_rodin-twrp device/xiaomi/rodin || true
 
       - name: Budowanie Recovery (MediaTek / rodin)
@@ -66,10 +65,8 @@ jobs:
           export ALLOW_MISSING_DEPENDENCIES=true
           source build/envsetup.sh
           
-          # Wybór luncza (zmień na odpowiedni prefix w zależności od definicji w drzewie rodin)
           lunch aera_rodin-userdebug || lunch omni_rodin-userdebug || lunch twrp_rodin-userdebug
           
-          # Dla urządzeń MediaTek z dynamicznymi partycjami budujemy recovery oraz vendor_boot
           mka recoveryimage vendor_bootimage
 
       - name: Przesłanie artefaktów wynikowych
