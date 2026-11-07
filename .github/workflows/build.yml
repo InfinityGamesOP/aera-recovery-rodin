@@ -40,8 +40,8 @@ jobs:
         export PATH=~/.bin:$PATH
         mkdir -p ~/aera && cd ~/aera
 
-        # Inicjalizacja bazy źródeł TWRP/AOSP 12.1
-        repo init -u https://github.com/minimal-manifest-twrp/platform_manifest_twrp_aosp.git -b twrp-12.1 --depth=1
+        # Inicjalizacja nowoczesnego manifestu LineageOS 21.0 (Android 14) kompatybilnego z drzewem rodin
+        repo init -u https://github.com/LineageOS/android.git -b lineage-21.0 --depth=1
         repo sync -c --no-clone-bundle --no-tags --optimized-fetch --prune -j$(nproc --all)
 
         # Podmiana silnika recovery na AERA
@@ -51,64 +51,35 @@ jobs:
         # Pobranie drzewa urządzeń dla Poco X7 Pro (rodin)
         git clone https://github.com/xiaomi-mt6899-dev/android_device_xiaomi_rodin.git device/xiaomi/rodin --depth=1
 
-        # Pobranie wymaganych zależności sprzętowych
-        git clone https://github.com/LineageOS/android_hardware_mediatek.git hardware/mediatek --depth=1 || true
-        git clone https://github.com/LineageOS/android_device_mediatek_sepolicy_vndr.git device/mediatek/sepolicy_vndr --depth=1 || true
+        # Pobranie brakujących zależności jądra dla rodin (jeśli istnieją w oddzielnym repo)
+        git clone https://github.com/xiaomi-mt6899-dev/android_device_xiaomi_rodin-kernel.git device/xiaomi/rodin-kernel --depth=1 || true
 
-        # CAŁKOWITE USUNIĘCIE NIEKOMPATYBILNYCH KATALOGÓW I PLIKÓW Android.bp
-        rm -rf hardware/lineage/compat
-        find . -name "Android.bp" -delete
-
-        # Tworzenie atrapy plików vendor i modułów jądra
-        mkdir -p vendor/xiaomi/rodin
-        echo '# Dummy vendor makefile' > vendor/xiaomi/rodin/rodin-vendor.mk
-        mkdir -p device/mediatek/sepolicy_vndr
-        touch device/mediatek/sepolicy_vndr/SEPolicy.mk
-
-        mkdir -p device/xiaomi/rodin-kernel
-        touch device/xiaomi/rodin-kernel/modules.load.system
-        touch device/xiaomi/rodin-kernel/modules.load.vendor
-        touch device/xiaomi/rodin-kernel/modules.load.vendor_ramdisk
-        touch device/xiaomi/rodin-kernel/modules.load.recovery
-
-        # Konfiguracja drzewa urządzenia i oczyszczenie flag armv9-a
+        # Konfiguracja drzewa urządzenia pod recovery
         cd device/xiaomi/rodin
-        
         sed -i '/FOX_/d' BoardConfig.mk || true
         sed -i '/OF_/d' BoardConfig.mk || true
-        sed -i '/vendor\/xiaomi\/rodin/d' BoardConfig.mk || true
-        sed -i '/sepolicy_vndr/d' BoardConfig.mk || true
-        
-        sed -i 's/armv9-a/armv8-2a/g' BoardConfig.mk || true
-        sed -i 's/armv9/armv8/g' BoardConfig.mk || true
 
-        # Tworzenie pliku omni_rodin.mk
-        cat << 'EOF' > omni_rodin.mk
-        LOCAL_DIR := device/xiaomi/rodin
+        # Tworzenie pliku omni_rodin.mk jeśli go brak
+        if [ ! -f omni_rodin.mk ]; then
+          TARGET_MK=$(ls *.mk | grep -E 'lineage|device' | head -n 1)
+          if [ -n "$TARGET_MK" ]; then
+            cp "$TARGET_MK" omni_rodin.mk
+          else
+            cp BoardConfig.mk omni_rodin.mk
+          fi
+        fi
 
-        $(call inherit-product, $(SRC_TARGET_DIR)/product/full_base_telephony.mk)
-        $(call inherit-product, $(SRC_TARGET_DIR)/product/core_64_bit.mk)
-
-        PRODUCT_NAME := omni_rodin
-        PRODUCT_DEVICE := rodin
-        PRODUCT_MANUFACTURER := xiaomi
-        PRODUCT_BRAND := Xiaomi
-        PRODUCT_MODEL := Poco X7 Pro
-
-        PRODUCT_GMS_CLIENTID_BASE := android-xiaomi
-        EOF
-
-        # Utworzenie AndroidProducts.mk
-        echo -e "PRODUCT_MAKEFILES := \$(LOCAL_DIR)/omni_rodin.mk\nCOMMON_LUNCH_CHOICES := omni_rodin-eng omni_rodin-userdebug" > AndroidProducts.mk
+        # Wymuszenie wpisów lunch w AndroidProducts.mk
+        echo -e "PRODUCT_MAKEFILES := \$(LOCAL_DIR)/omni_rodin.mk\nCOMMON_LUNCH_CHOICES := lineage_rodin-eng lineage_rodin-userdebug omni_rodin-eng omni_rodin-userdebug" > AndroidProducts.mk
 
         cd ~/aera
 
-        # Przygotowanie środowiska i uruchomienie kompilacji
+        # Przygotowanie środowiska i kompilacja
         source build/envsetup.sh
         export ALLOW_MISSING_DEPENDENCIES=true
         export LC_ALL=C
 
-        lunch omni_rodin-eng || lunch omni_rodin-userdebug
+        lunch lineage_rodin-userdebug || lunch omni_rodin-eng
 
         mka vendorbootimage -j$(nproc --all) || mka recoveryimage -j$(nproc --all)
 
