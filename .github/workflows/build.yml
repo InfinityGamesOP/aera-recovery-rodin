@@ -40,7 +40,7 @@ jobs:
         export PATH=~/.bin:$PATH
         mkdir -p ~/aera && cd ~/aera
 
-        # Inicjalizacja bazy źródeł TWRP/AOSP 12.1
+        # Inicjalizacja stabilniejszego manifestu OmniROM 12.1/13.0
         repo init -u https://github.com/minimal-manifest-twrp/platform_manifest_twrp_aosp.git -b twrp-12.1 --depth=1
         repo sync -c --no-clone-bundle --no-tags --optimized-fetch --prune -j$(nproc --all)
 
@@ -56,27 +56,29 @@ jobs:
         git clone https://github.com/LineageOS/android_hardware_mediatek.git hardware/mediatek --depth=1 || true
         git clone https://github.com/LineageOS/android_device_mediatek_sepolicy_vndr.git device/mediatek/sepolicy_vndr --depth=1 || true
 
-        # Atrapa katalogu/pliku vendor oraz zaleznosci SEPolicy
+        # Tworzenie atrapy plików vendor i modułów jądra
         mkdir -p vendor/xiaomi/rodin
         echo '# Dummy vendor makefile' > vendor/xiaomi/rodin/rodin-vendor.mk
         mkdir -p device/mediatek/sepolicy_vndr
         touch device/mediatek/sepolicy_vndr/SEPolicy.mk
 
-        # Tworzenie atrapy brakujących plików modułów jądra
         mkdir -p device/xiaomi/rodin-kernel
         touch device/xiaomi/rodin-kernel/modules.load.system
         touch device/xiaomi/rodin-kernel/modules.load.vendor
         touch device/xiaomi/rodin-kernel/modules.load.vendor_ramdisk
         touch device/xiaomi/rodin-kernel/modules.load.recovery
 
-        # Konfiguracja drzewa pod build omni/twrp
+        # Konfiguracja drzewa urządzenia i oczyszczenie flag armv9-a
         cd device/xiaomi/rodin
         
-        # Usunięcie odwołań blokujących kompilację recovery
         sed -i '/FOX_/d' BoardConfig.mk || true
         sed -i '/OF_/d' BoardConfig.mk || true
         sed -i '/vendor\/xiaomi\/rodin/d' BoardConfig.mk || true
         sed -i '/sepolicy_vndr/d' BoardConfig.mk || true
+        
+        # Poprawka nieznanej architektury armv9-a na bezpieczną armv8-a / armv8-2a
+        sed -i 's/armv9-a/armv8-2a/g' BoardConfig.mk || true
+        sed -i 's/armv9/armv8/g' BoardConfig.mk || true
 
         # Tworzenie pliku omni_rodin.mk
         cat << 'EOF' > omni_rodin.mk
