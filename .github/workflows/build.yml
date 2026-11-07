@@ -92,8 +92,8 @@ jobs:
           
           lunch twrp_rodin-ap3a-userdebug || lunch twrp_rodin-ap3a-eng || lunch aera_rodin-ap3a-userdebug || lunch omni_rodin-ap3a-eng || lunch twrp_rodin-eng
           
-          # Użycie -j1 zapobiega przepełnieniu pamięci RAM podczas kompilacji Soong/Ninja
-          mka -j1 recoveryimage vendor_bootimage
+          # Poprawiona nazwa targetu: vendorbootimage zamiast vendor_bootimage
+          mka -j1 recoveryimage vendorbootimage
 
       - name: Przesłanie artefaktów wynikowych
         uses: actions/upload-artifact@v4
