@@ -51,8 +51,11 @@ jobs:
         # Pobranie drzewa urządzeń dla Poco X7 Pro (rodin)
         git clone https://github.com/xiaomi-mt6899-dev/android_device_xiaomi_rodin.git device/xiaomi/rodin --depth=1
 
-        # Pobranie wymaganych zależności systemowych/hardware
+        # Pobranie wymaganych zależności hardware/Lineage
         git clone https://github.com/LineageOS/android_hardware_lineage_compat.git hardware/lineage/compat --depth=1
+        
+        # DODANE: Pobranie brakującego komponentu MediaTek wymaganego przez drzewo rodin
+        git clone https://github.com/LineageOS/android_hardware_mediatek.git -b lineage-21.0 hardware/mediatek --depth=1
 
         # Konfiguracja drzewa pod build omni/twrp
         cd device/xiaomi/rodin
