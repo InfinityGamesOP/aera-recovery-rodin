@@ -58,7 +58,6 @@ jobs:
           git config --global user.email "actions@github.com"
           
           repo init -u https://github.com/AERA-Recovery/android_manifest.git -b ${{ inputs.branch }} --depth=1
-          # Ograniczenie liczby wątków do 4 (-j4) zapobiega błędom sieciowym RPC w GitHub Actions
           repo sync -j4 --force-sync --no-clone-bundle --no-tags
 
       - name: Pobranie drzewa urządzenia dla Poco X7 Pro (rodin)
@@ -72,7 +71,13 @@ jobs:
           export ALLOW_MISSING_DEPENDENCIES=true
           source build/envsetup.sh
           
-          lunch aera_rodin-userdebug || lunch omni_rodin-userdebug || lunch twrp_rodin-userdebug
+          # Automatyczne wykrycie zdefiniowanego lunch targetu z AndroidProducts.mk lub fabrycznych definicji
+          TARGET=$(grep -E 'PRODUCT_MAKEFILES' device/xiaomi/rodin/AndroidProducts.mk -A 5 2>/dev/null | grep -oE '[a-zA-Z0-0_]+_rodin' | head -n 1 || echo "twrp_rodin")
+          
+          echo "Wykryto cel budowania: $TARGET"
+          
+          # Próba wywołania w nowym oraz tradycyjnym formacie lunch
+          lunch ${TARGET}-trunk_staging-userdebug || lunch ${TARGET}-userdebug || lunch omni_rodin-eng || lunch twrp_rodin-eng
           
           mka recoveryimage vendor_bootimage
 
