@@ -57,7 +57,6 @@ jobs:
         sed -i '/FOX_/d' BoardConfig.mk || true
         sed -i '/OF_/d' BoardConfig.mk || true
 
-        # Automatyczne wykrycie i przemianowanie głównego pliku makefile na zgodny z device
         PROD_MK=$(ls *.mk | grep -E 'rodin|device|lineage' | head -n 1)
         if [ -n "$PROD_MK" ]; then
           cp "$PROD_MK" lineage_rodin.mk
@@ -65,27 +64,25 @@ jobs:
           cp BoardConfig.mk lineage_rodin.mk
         fi
 
-        # Poprawne zdefiniowanie AndroidProducts.mk powiązanego z drzewem
         cat << 'EOF' > AndroidProducts.mk
         PRODUCT_MAKEFILES := \
             $(LOCAL_DIR)/lineage_rodin.mk
 
         COMMON_LUNCH_CHOICES := \
-            lineage_rodin-userdebug \
-            lineage_rodin-eng
+            lineage_rodin-ap2a-userdebug \
+            lineage_rodin-ap2a-eng
         EOF
 
         cd ~/aera
 
-        # Przygotowanie środowiska i kompilacja
+        # Przygotowanie środowiska, ustawienie wymaganej konfiguracji release i kompilacja
         source build/envsetup.sh
         export ALLOW_MISSING_DEPENDENCIES=true
         export LC_ALL=C
+        export TARGET_RELEASE=ap2a
 
-        # Sprawdzenie dostępnych targetów i uruchomienie builda
-        lunch lineage_rodin-userdebug || lunch lineage_rodin-eng || true
+        lunch lineage_rodin-ap2a-userdebug || lunch lineage_rodin-ap2a-eng || true
 
-        # Fallback – jeśli lunch nie zadziała automatycznie, spróbujemy wywołać bezpośrednio kompilację recovery
         mka vendorbootimage -j$(nproc --all) || mka recoveryimage -j$(nproc --all)
 
     - name: Upload Recovery Artifact
