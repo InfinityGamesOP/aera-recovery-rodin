@@ -1,3 +1,128 @@
+name: Build AERA Recovery for Poco X7 Pro (rodin)
+
+on:
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: 'Branch manifestu AERA'
+        required: true
+        default: 'aera-16.0'
+        type: string
+      device_repo:
+        description: 'Repozytorium drzewa urządzenia'
+        required: true
+        default: 'https://github.com/KSN2redawew/android_device_xiaomi_rodin-twrp'
+        type: string
+      device_branch:
+        description: 'Branch drzewa urządzenia (puste = domyślny)'
+        required: false
+        default: ''
+        type: string
+      lunch_target:
+        description: 'Dokładny cel lunch, np. twrp_rodin-bp4a-eng (puste = autodetekcja)'
+        required: false
+        default: ''
+        type: string
+      remove_crashrecovery:
+        description: 'Usuń prebuilts/module_sdk/CrashRecovery (tylko jeśli build o to prosi)'
+        required: false
+        default: false
+        type: boolean
+
+env:
+  WORKDIR: /home/runner/aera-workspace
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 350
+    steps:
+      - name: Maksymalizacja wolnego miejsca na dysku
+        uses: jlumbroso/free-disk-space@main
+        with:
+          tool-cache: true
+          android: true
+          dotnet: true
+          haskell: true
+          large-packages: false
+          docker-images: true
+          swap-storage: true
+
+      - name: Utworzenie pliku SWAP (24 GB na /mnt)
+        run: |
+          sudo swapoff -a || true
+          sudo rm -f /mnt/swapfile
+          df -h / /mnt
+          sudo fallocate -l 24G /mnt/swapfile
+          sudo chmod 600 /mnt/swapfile
+          sudo mkswap /mnt/swapfile
+          sudo swapon /mnt/swapfile
+          sudo sysctl vm.swappiness=100
+          sudo sysctl vm.vfs_cache_pressure=200
+          free -h
+
+      - name: Instalacja zależności systemowych
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            git git-lfs gnupg flex bison build-essential zip unzip curl \
+            zlib1g-dev libc6-dev-i386 libncurses-dev \
+            x11proto-core-dev libx11-dev lib32z1-dev libgl1-mesa-dev \
+            libxml2-utils xsltproc fontconfig cpio rsync bc ccache \
+            python3 python-is-python3 lz4 xz-utils libssl-dev libelf-dev \
+            openjdk-17-jdk-headless
+          git lfs install
+
+      - name: Konfiguracja Git
+        run: |
+          git config --global user.name "GitHub Actions"
+          git config --global user.email "actions@github.com"
+          git config --global http.postBuffer 524288000
+          git config --global http.lowSpeedLimit 1000
+          git config --global http.lowSpeedTime 600
+          git config --global color.ui false
+
+      - name: Instalacja narzędzia repo
+        run: |
+          mkdir -p ~/.bin
+          curl -fsSL https://storage.googleapis.com/git-repo-downloads/repo -o ~/.bin/repo
+          chmod a+x ~/.bin/repo
+          echo "$HOME/.bin" >> "$GITHUB_PATH"
+
+      - name: Inicjalizacja i synchronizacja źródeł AERA
+        run: |
+          mkdir -p "$WORKDIR"
+          cd "$WORKDIR"
+          repo init -u https://github.com/AERA-Recovery/android_manifest.git \
+            -b "${{ inputs.branch }}" --depth=1 --git-lfs --no-clone-bundle
+          for i in 1 2 3; do
+            repo sync -c -j4 --force-sync --no-clone-bundle --no-tags --optimized-fetch --prune && break
+            echo "repo sync nieudany (próba $i), ponawiam..."
+            sleep 15
+          done
+          test -f build/envsetup.sh
+          df -h /
+
+      - name: Pobranie drzewa urządzenia (rodin)
+        run: |
+          cd "$WORKDIR"
+          BR=""
+          if [ -n "${{ inputs.device_branch }}" ]; then BR="-b ${{ inputs.device_branch }}"; fi
+          rm -rf device/xiaomi/rodin
+          git clone --depth=1 $BR "${{ inputs.device_repo }}" device/xiaomi/rodin
+          cd device/xiaomi/rodin
+          git lfs pull || true
+          echo "--- zawartość drzewa urządzenia ---"
+          ls -la
+          echo "--- pliki .mk ---"
+          ls *.mk
+
+      - name: Opcjonalne usunięcie CrashRecovery
+        if: ${{ inputs.remove_crashrecovery }}
+        run: |
+          cd "$WORKDIR"
+          rm -rf prebuilts/module_sdk/CrashRecovery
+
       - name: Budowanie Recovery
         run: |
           cd "$WORKDIR"
@@ -8,9 +133,10 @@
           export CCACHE_DIR=$HOME/.ccache
           ccache -M 10G
 
-          # Optymalizacja pamięci RAM dla glibc i Soong/Go
-          export MALLOC_ARENA_MAX=2
+          # Ograniczenie zużycia pamięci (runner ma ~16 GB RAM)
+          export JAVA_TOOL_OPTIONS="-Xmx4g"
           export NINJA_ARGS="-j2"
+          export SOONG_UI_NINJA_ARGS="-j2"
 
           # Wykrycie nazw produktów z drzewa urządzenia
           DETECTED=$(grep -hE '^\s*PRODUCT_NAME\s*[:+]?=' device/xiaomi/rodin/*.mk 2>/dev/null \
@@ -21,22 +147,35 @@
           source build/envsetup.sh
 
           LUNCH_OK=0
-          for product in $DETECTED aera_rodin twrp_rodin omni_rodin; do
-            for release in bp4a bp3a bp2a bp1a ap4a ap3a trunk_staging; do
-              for variant in eng userdebug; do
-                echo ">>> lunch ${product}-${release}-${variant}"
-                if lunch "${product}-${release}-${variant}" >/tmp/lunch.log 2>&1; then
-                  cat /tmp/lunch.log
-                  LUNCH_OK=1
-                  break 3
-                fi
+
+          # 1) Cel podany ręcznie
+          if [ -n "${{ inputs.lunch_target }}" ]; then
+            echo ">>> lunch ${{ inputs.lunch_target }}"
+            if lunch "${{ inputs.lunch_target }}" >/tmp/lunch.log 2>&1; then
+              cat /tmp/lunch.log
+              LUNCH_OK=1
+            fi
+          fi
+
+          # 2) Autodetekcja (twrp_rodin pierwszy, bo wiadomo że istnieje)
+          if [ "$LUNCH_OK" -ne 1 ]; then
+            for product in twrp_rodin $DETECTED aera_rodin omni_rodin; do
+              for release in bp4a bp3a bp2a bp1a ap4a ap3a trunk_staging; do
+                for variant in eng userdebug; do
+                  echo ">>> lunch ${product}-${release}-${variant}"
+                  if lunch "${product}-${release}-${variant}" >/tmp/lunch.log 2>&1; then
+                    cat /tmp/lunch.log
+                    LUNCH_OK=1
+                    break 3
+                  fi
+                done
               done
             done
-          done
+          fi
 
+          # 3) Stary format bez release
           if [ "$LUNCH_OK" -ne 1 ]; then
-            # ostatnia szansa: stary format bez release
-            for product in $DETECTED aera_rodin twrp_rodin omni_rodin; do
+            for product in twrp_rodin $DETECTED aera_rodin omni_rodin; do
               for variant in eng userdebug; do
                 if lunch "${product}-${variant}" >/tmp/lunch.log 2>&1; then
                   cat /tmp/lunch.log
@@ -50,12 +189,14 @@
           if [ "$LUNCH_OK" -ne 1 ]; then
             echo "::error::Żaden wariant lunch nie zadziałał. Ostatni log:"
             cat /tmp/lunch.log
-            echo "Dostępne kombinacje:"
             lunch 2>&1 | head -50
             exit 1
           fi
 
-          # Ograniczenie liczby wątków do 2, aby nie doprowadzić do OOM
+          echo "=== Pamięć przed buildem ==="
+          free -h
+
+          # Główny target: recovery w vendor_boot; recoveryimage jako fallback
           BUILT=0
           mka -j2 vendorbootimage && BUILT=1
           mka -j2 recoveryimage && BUILT=1
@@ -63,3 +204,24 @@
             echo "::error::Build nie powiódł się"
             exit 1
           fi
+
+      - name: Diagnostyka OOM
+        if: always()
+        run: |
+          free -h || true
+          sudo dmesg | grep -i -E "killed process|out of memory|oom" | tail -20 || true
+
+      - name: Lista wygenerowanych obrazów
+        if: always()
+        run: |
+          ls -lh "$WORKDIR"/out/target/product/rodin/*.img 2>/dev/null || echo "Brak plików .img"
+
+      - name: Przesłanie artefaktów
+        uses: actions/upload-artifact@v4
+        with:
+          name: AERA-Recovery-Poco-X7Pro-rodin
+          if-no-files-found: error
+          path: |
+            /home/runner/aera-workspace/out/target/product/rodin/recovery.img
+            /home/runner/aera-workspace/out/target/product/rodin/vendor_boot.img
+            /home/runner/aera-workspace/out/target/product/rodin/boot.img
