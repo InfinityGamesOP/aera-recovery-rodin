@@ -48,18 +48,20 @@ jobs:
           docker-images: true
           swap-storage: true
 
-      - name: Utworzenie pliku SWAP (24 GB na /mnt)
+      - name: Utworzenie pliku SWAP (16 GB na /mnt) i katalogu out
         run: |
           sudo swapoff -a || true
           sudo rm -f /mnt/swapfile
           df -h / /mnt
-          sudo fallocate -l 24G /mnt/swapfile
+          sudo fallocate -l 16G /mnt/swapfile
           sudo chmod 600 /mnt/swapfile
           sudo mkswap /mnt/swapfile
           sudo swapon /mnt/swapfile
           sudo sysctl vm.swappiness=100
           sudo sysctl vm.vfs_cache_pressure=200
           free -h
+          sudo mkdir -p /mnt/aera-out
+          sudo chown -R runner:runner /mnt/aera-out
 
       - name: Instalacja zależności systemowych
         run: |
@@ -101,7 +103,8 @@ jobs:
             sleep 15
           done
           test -f build/envsetup.sh
-          df -h /
+          sudo apt-get clean
+          df -h / /mnt
 
       - name: Pobranie drzewa urządzenia (rodin)
         run: |
@@ -128,10 +131,13 @@ jobs:
           cd "$WORKDIR"
           export ALLOW_MISSING_DEPENDENCIES=true
           export LC_ALL=C
-          export USE_CCACHE=1
-          export CCACHE_EXEC=/usr/bin/ccache
-          export CCACHE_DIR=$HOME/.ccache
-          ccache -M 10G
+          # out na /mnt (dysk / jest za mały); ccache wyłączony (build jednorazowy)
+          export OUT_DIR=/mnt/aera-out
+
+          # monitor dysku co 5 min (do diagnostyki)
+          ( while true; do sleep 300; echo "[monitor] $(date +%T)"; df -h / /mnt | tail -n +1; done ) &
+          MON_PID=$!
+          export USE_CCACHE=0
 
           # Ograniczenie zużycia pamięci (runner ma ~16 GB RAM)
           export JAVA_TOOL_OPTIONS="-Xmx4g"
@@ -193,13 +199,15 @@ jobs:
             exit 1
           fi
 
-          echo "=== Pamięć przed buildem ==="
+          echo "=== Pamięć i dysk przed buildem ==="
           free -h
+          df -h / /mnt
 
           # Główny target: recovery w vendor_boot; recoveryimage jako fallback
           BUILT=0
           mka -j2 vendorbootimage && BUILT=1
           mka -j2 recoveryimage && BUILT=1
+          kill $MON_PID 2>/dev/null
           if [ "$BUILT" -ne 1 ]; then
             echo "::error::Build nie powiódł się"
             exit 1
@@ -209,12 +217,13 @@ jobs:
         if: always()
         run: |
           free -h || true
+          df -h / /mnt || true
           sudo dmesg | grep -i -E "killed process|out of memory|oom" | tail -20 || true
 
       - name: Lista wygenerowanych obrazów
         if: always()
         run: |
-          ls -lh "$WORKDIR"/out/target/product/rodin/*.img 2>/dev/null || echo "Brak plików .img"
+          ls -lh /mnt/aera-out/target/product/rodin/*.img 2>/dev/null || echo "Brak plików .img"
 
       - name: Przesłanie artefaktów
         uses: actions/upload-artifact@v4
@@ -222,6 +231,6 @@ jobs:
           name: AERA-Recovery-Poco-X7Pro-rodin
           if-no-files-found: error
           path: |
-            /home/runner/aera-workspace/out/target/product/rodin/recovery.img
-            /home/runner/aera-workspace/out/target/product/rodin/vendor_boot.img
-            /home/runner/aera-workspace/out/target/product/rodin/boot.img
+            /mnt/aera-out/target/product/rodin/recovery.img
+            /mnt/aera-out/target/product/rodin/vendor_boot.img
+            /mnt/aera-out/target/product/rodin/boot.img
